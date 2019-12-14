@@ -114,6 +114,11 @@ def extract_behaviour_sync(sync, output_path=None, save=False, chmap=None):
         reward_pump = cut_odd_events(new_end,reward_pump)
         reward_port = cut_odd_events(new_end,reward_port)
     
+    #Assertion QC
+    assert np.count_nonzero(trial['times']) % 2 ==0,'ERROR: Uneven trial fronts'
+    assert np.count_nonzero(trial['times']) % 2 ==0,'ERROR: Uneven trial fronts'
+    
+    
     # Divide by on and off
     trial_on = trial['times'][::2] # {'times' : trial['times'][::2], 'polarities' : trial['polarities'][::2]}
     trial_off = trial['times'][1::2]
@@ -135,69 +140,121 @@ def extract_behaviour_sync(sync, output_path=None, save=False, chmap=None):
     reward_pump_off = reward_pump['times'][1::2]
     
     # Calculate some trial variables
-  
+    trial_trial_on = trial_trial_off = trial_sample_on = trial_sample_off = \
+    trial_delay_on = trial_delay_off = trial_choice_on = trial_choice_off = \
+    trial_right_lever_on = trial_right_lever_off = trial_reward_pump_on = \
+    trial_reward_pump_off = np.empty(len(trial_on))
     
-    for t in len(trial_on):
+    trial_trial_on[:] = trial_trial_off[:] = trial_sample_on[:] = trial_sample_off[:] = \
+    trial_delay_on[:] = trial_delay_off[:] = trial_choice_on[:] = trial_choice_off[:] = \
+    trial_right_lever_on[:] = trial_right_lever_off[:] =  trial_reward_pump_on[:] = \
+    trial_reward_pump_off[:] = np.nan
+    
+    #Empty matrix for variables with variable length per trial
+    trial_outcome_on = trial_outcome_off = trial_opto_on = trial_opto_off = \
+    trial_nosepoke_on = trial_nosepoke_off = []
+    
+    # Fill trial vectors
+    trial_trial_on = trial_on
+    trial_trial_off = trial_off
+    trial_sample_on = sample_on
+    trial_sample_off = sample_off
+    
+    assert len(trial_on) == len(trial_off) == len(sample_on) == len(sample_off) \
+        , 'ERROR: Samples and trials dont match!'
+    
+    
+    # Fill in trial vectors that require computation, giving 0.001 leeway for
+    # some variables
+    for t in range(len(trial_on)):
         # Giving 1 ms leeway for syncing pulse error
-        trial_on_t = trial_on[t]
-        trial_off_ = trial_off[t] 
-        
-        if #To do fill nan for other time periods is not intrial and time if in trial
-        #re calculate everything below with that
-        sample_on_t = sample_on[t] 
-        sample_off_t = sample_off[t] 
-        delay_on_t = delay_on[t] 
-        delay_off_t = delay_off[t] 
-        choice_on_t = delay_on[t] 
-        choice_off_t = delay_off[t] 
-        
-        trial_side[t] = 'R' if any(np.logical_and(right_lever_on>= sample_on_t - 0.001, 
-                            right_lever_on<=sample_off_t + 0.001)) else 'L'
-        opto_trial[t] = True if any(np.logical_and(opto_on>= trial_on_t, 
-                            opto_on<=trial_off_t)) else False
+        # Variables that require logic computation
+        trial_side[t] = 'R' if any(np.logical_and(right_lever_on>= sample_on[t] 
+                      - 0.001, right_lever_on<=sample_off[t] + 0.001)) else 'L'
+        opto_trial[t] = True if any(np.logical_and(opto_on>= trial_on[t], 
+                            opto_on<=trial_off[t])) else False
         if opto_trial == True:
-            if any(np.logical_and(opto_on>= sample_on_t, 
-                            opto_on<=sample_off_t)):
+            if any(np.logical_and(opto_on>= sample_on[t], 
+                            opto_on<=sample_off[t])):
                 opto_event[t] = 'S' 
             if any(np.logical_and(opto_on>= delay_on_t, 
-                            opto_on<=delay_off_t)):
+                            opto_on<=delay_off[t])):
                 opto_event[t] =  'D'
             if any(np.logical_and(opto_on>= choice_on_t, 
-                            opto_on<=choice_off_t)):
+                            opto_on<=choice_off[t])):
                 opto_event[t] =  'C'
         
+        #Variables that can only have one value per trial
         
-    
-    events = {'trial': trial, 'delay': delay, 'choice': choice, 'outcome':
-        outcome, 'opto': opto, 'right_lever': right_lever,'nosepoke': nosepoke,
-        'reward_pump': reward_pump, 'reward_port': reward_port}
-    
-    #Assertion QC
-    assert np.count_nonzero(trial['times']) % 2 ==0,'ERROR: Uneven trial fronts'
-    assert np.count_nonzero(trial['times']) % 2 ==0,'ERROR: Uneven trial fronts'
+        trial_delay_on[t] = delay_on[np.logical_and(delay_on>= trial_on[t] 
+                      , delay_on<=trial_off[t])] if any(np.logical_and(delay_on
+                        >= trial_on[t], delay_on <= trial_off[t])) else np.nan
+        
+        trial_delay_off[t] = delay_off[np.logical_and(delay_off>= trial_on[t] 
+                      , delay_off<=trial_off[t])] if any(np.logical_and(delay_off
+                        >= trial_on[t], delay_off <= trial_off[t])) else np.nan
 
-    if DEBUG_PLOTS:
-        plt.figure()
-        ax = plt.gca()
-        plots.squares(trial['times'], trial['polarities'] * 0.4 + 1,
-                      ax=ax, label='trial=1', color='k')
-        plots.squares(frame2ttl['times'], frame2ttl['polarities'] * 0.4 + 2,
-                      ax=ax, label='frame2ttl=2', color='k')
-        plots.squares(audio['times'], audio['polarities'] * 0.4 + 3,
-                      ax=ax, label='audio=3', color='k')
-        plots.vertical_lines(t_ready_tone_in, ymin=0, ymax=4,
-                             ax=ax, label='ready tone in', color='b', linewidth=0.5)
-        plots.vertical_lines(t_trial_start, ymin=0, ymax=4,
-                             ax=ax, label='start_trial', color='m', linewidth=0.5)
-        plots.vertical_lines(t_error_tone_in, ymin=0, ymax=4,
-                             ax=ax, label='error tone', color='r', linewidth=0.5)
-        plots.vertical_lines(t_valve_open, ymin=0, ymax=4,
-                             ax=ax, label='valve open', color='g', linewidth=0.5)
-        plots.vertical_lines(t_stim_freeze, ymin=0, ymax=4,
-                             ax=ax, label='stim freeze', color='y', linewidth=0.5)
-        plots.vertical_lines(t_stim_off, ymin=0, ymax=4,
-                             ax=ax, label='stim off', color='c', linewidth=0.5)
-        ax.legend()
+        trial_choice_on[t] = choice_on[np.logical_and(choice_on>= trial_on[t] 
+                      , choice_on<=trial_off[t])] if any(np.logical_and(choice_on
+                        >= trial_on[t], choice_on <= trial_off[t])) else np.nan
+        
+        trial_choice_off[t] = choice_off[np.logical_and(choice_off>= trial_on[t] 
+                      , choice_off<=trial_off[t])] if any(np.logical_and(choice_off
+                        >= trial_on[t], choice_off <= trial_off[t])) else np.nan
+        
+        trial_reward_pump_on[t] = reward_pump_on[np.logical_and(reward_pump_on>= trial_on[t] 
+                      , reward_pump_on<=trial_off[t])] if any(np.logical_and(reward_pump_on
+                        >= trial_on[t], reward_pump_on <= trial_off[t])) else np.nan
+        
+        trial_reward_pump_off[t] = reward_pump_off[np.logical_and(reward_pump_off>= trial_on[t] 
+                      , reward_pump_off<=trial_off[t])] if any(np.logical_and(reward_pump_off
+                        >= trial_on[t], reward_pump_off <= trial_off[t])) else np.nan
+        
+        # Variables that can have more than on value per trial
+        trial_outcome_on.append(outcome_on[np.logical_and(outcome_on>= trial_on[t] 
+                      , outcome_on<=trial_off[t])] if any(np.logical_and(outcome_on
+                        >= trial_on[t], outcome_on <= trial_off[t])) else np.nan)
+        
+        trial_outcome_off.append(outcome_off[np.logical_and(outcome_off>= trial_on[t] 
+                      , outcome_off<=trial_off[t])] if any(np.logical_and(outcome_off
+                        >= trial_on[t], outcome_off <= trial_off[t])) else np.nan)
+        
+        trial_opto_on.append(opto_on[np.logical_and(opto_on>= trial_on[t] 
+                      , opto_on<=trial_off[t])] if any(np.logical_and(opto_on
+                        >= trial_on[t], opto_on <= trial_off[t])) else np.nan)
+        
+        trial_opto_off.append(opto_off[np.logical_and(opto_off>= trial_on[t] 
+                      , opto_off<=trial_off[t])] if any(np.logical_and(opto_off
+                        >= trial_on[t], opto_off <= trial_off[t])) else np.nan)
+        
+        trial_nosepoke_on.append(nosepoke_on[np.logical_and(nosepoke_on>= trial_on[t] 
+                      , nosepoke_on<=trial_off[t])] if any(np.logical_and(nosepoke_on
+                        >= trial_on[t], nosepoke_on <= trial_off[t])) else np.nan)
+        
+        trial_nosepoke_off.append(nosepoke_off[np.logical_and(nosepoke_off>= trial_on[t] 
+                      , nosepoke_off<=trial_off[t])] if any(np.logical_and(nosepoke_off
+                        >= trial_on[t], nosepoke_off <= trial_off[t])) else np.nan)
+        
+        # Calculate vector of completed trials
+        trial_completed = np.logical_and(trial_delay_on[t] != np.nan,trial_choice_on[t] != np.nan
+                      , nosepoke_on<=trial_off[t])
+        
+        
+        # Calculates vector of correct trials
+        trial_correct = np.logical_and(trial_delay_on[t] != np.nan,trial_choice_on[t] != np.nan,
+                       trial_reward_pump_on[t] != np.nan)
+        
+        # Calculate vector with extremes of outcome,opto and nosepoke
+        trial_outcome_first = min(i) for i in trial_outcome_on[t]
+        trial_outcome_last = min(i) for i in trial_outcome_off[t]
+        trial_nosepoke_first = min(i) for i in trial_nosepoke_on[t]
+        trial_nosepoke_last = min(i) for i in trial_nosepoke_off[t]
+        trial_opto_first = min(i) for i in trial_opto_on[t]
+        trial_opto_last = min(i) for i in trial_opto_off[t]
+        
+        if save == True:
+            
+    
 
 
 def _get_sync_fronts(sync, channel_nb):
