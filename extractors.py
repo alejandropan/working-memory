@@ -215,43 +215,4 @@ extract_behaviour_sync(sync, output_path=None, save=True, chmap=None)
 
 
 
-#######Work in progress. Making everything more object oriented
-
-
-class Syncing(session_path, event_type):
-    """
-    Defining an object that contacins all the sync pulses
-    
-    on_times: The timing of every event onset (list)
-                -off_times:  The timing of every event offset (list)
-                -number: The number of trials   (int)
-    :param session_path Path to NP session
-    :param even_type List of strings with event types      
-    """
-
-    
-class Session(session_path, chmap):
-    """
-    Defining an object that contains all the information about the syncing in
-    a session. The Logic is as follows:
-        
-        Session:
-            -Channel_map: Dict of strings with the names of events and 
-            corresponding syncing channel numbers (dict)
-            -Trials: 
-                - Events: 
-                    -Start_time
-                    -End_time
-                    -Neurons:
-                        -Depth:
-                        -Region:
-                        -Spike:
-                            time:
-                            amplitude:
-          
-            -Tests:
-                -run_tests: A session has test to check syncing (method)       
-    """
-        
-
 
