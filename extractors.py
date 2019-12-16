@@ -5,17 +5,21 @@ Created on Sun Dec  8 17:53:22 2019
 
 @author: ibladmin
 """
-
+from ibllib.io.spikeglx import  get_neuropixel_version_from_files
+from ibllib.io.extractors.ephys_fpga import  _get_sync_fronts
 from ibllib.io.extractors.ephys_fpga import *
 from pathlib import Path
 from brainbox.core import Bunch
 import matplotlib.pyplot as plt
 import ibllib.plots as plots
 import numpy as np
+import math
+import sys
+
 
 # Function definitions
 
-def extract_camera_sync(sync, output_path=session, save=False, chmap=None):
+def extract_camera_sync(sync, output_path=None, save=False, chmap=None):
     """
     Extract camera timestamps from the sync matrix
     :param sync: dictionary 'times', 'polarities' of fronts detected on sync trace
@@ -140,51 +144,80 @@ def extract_behaviour_sync(sync, output_path=None, save=False, chmap=None):
     reward_pump_off = reward_pump['times'][1::2]
     
     # Calculate some trial variables
-    trial_trial_on = trial_trial_off = trial_sample_on = trial_sample_off = \
-    trial_delay_on = trial_delay_off = trial_choice_on = trial_choice_off = \
-    trial_right_lever_on = trial_right_lever_off = trial_reward_pump_on = \
+    trial_trial_on = np.empty(len(trial_on))
+    trial_trial_off = np.empty(len(trial_on))
+    trial_opto_trial = np.empty(len(trial_on))
+    trial_sample_on = np.empty(len(trial_on))
+    trial_sample_off = np.empty(len(trial_on))
+    trial_delay_on = np.empty(len(trial_on))
+    trial_delay_off = np.empty(len(trial_on))
+    trial_choice_on = np.empty(len(trial_on))
+    trial_choice_off = np.empty(len(trial_on))
+    trial_right_lever_on = np.empty(len(trial_on))
+    trial_right_lever_off = np.empty(len(trial_on))
+    trial_reward_pump_on = np.empty(len(trial_on))
     trial_reward_pump_off = np.empty(len(trial_on))
-    
-    trial_trial_on[:] = trial_trial_off[:] = trial_sample_on[:] = trial_sample_off[:] = \
-    trial_delay_on[:] = trial_delay_off[:] = trial_choice_on[:] = trial_choice_off[:] = \
-    trial_right_lever_on[:] = trial_right_lever_off[:] =  trial_reward_pump_on[:] = \
+    trial_completed = np.empty(len(trial_on))
+    trial_correct = np.empty(len(trial_on))
+    trial_outcome_first = np.empty(len(trial_on))
+    trial_outcome_last = np.empty(len(trial_on))
+    trial_nosepoke_first = np.empty(len(trial_on))
+    trial_nosepoke_last = np.empty(len(trial_on))
+    trial_opto_first = np.empty(len(trial_on))
+    trial_opto_last = np.empty(len(trial_on))
+    trial_completed[:] = np.nan
+    trial_correct[:] = np.nan
+    trial_outcome_first[:] = np.nan
+    trial_outcome_last[:] = np.nan
+    trial_nosepoke_first[:] = np.nan
+    trial_nosepoke_last[:] = np.nan
+    trial_opto_first[:] = np.nan
+    trial_opto_last[:] = np.nan
+    trial_trial_on[:] = np.nan
+    trial_trial_side = ['' for x in range(len(trial_on))]
+    trial_opto_event = ['' for x in range(len(trial_on))]
+    trial_opto_trial[:] = np.nan
+    trial_trial_off[:] = np.nan
+    trial_sample_on[:] = np.nan
+    trial_sample_off[:] = np.nan
+    trial_delay_on[:] = np.nan
+    trial_delay_off[:] = np.nan
+    trial_choice_on[:] = np.nan
+    trial_choice_off[:] = np.nan
+    trial_right_lever_on[:] = np.nan
+    trial_right_lever_off[:] =  np.nan
+    trial_reward_pump_on[:] = np.nan
     trial_reward_pump_off[:] = np.nan
     
     #Empty matrix for variables with variable length per trial
-    trial_outcome_on = trial_outcome_off = trial_opto_on = trial_opto_off = \
-    trial_nosepoke_on = trial_nosepoke_off = []
+    trial_outcome_on = []
+    trial_outcome_off = []
+    trial_opto_on = []
+    trial_opto_off = []
+    trial_nosepoke_on = [] 
+    trial_nosepoke_off = []
     
     # Fill trial vectors
     trial_trial_on = trial_on
     trial_trial_off = trial_off
-    trial_sample_on = sample_on
-    trial_sample_off = sample_off
+
     
-    assert len(trial_on) == len(trial_off) == len(sample_on) == len(sample_off) \
-        , 'ERROR: Samples and trials dont match!'
+    #assert len(trial_on) == len(trial_off) == len(sample_on) == len(sample_off) \
+     #   , 'ERROR: Samples and trials dont match!'
     
     
     # Fill in trial vectors that require computation, giving 0.001 leeway for
     # some variables
     for t in range(len(trial_on)):
-        # Giving 1 ms leeway for syncing pulse error
-        # Variables that require logic computation
-        trial_side[t] = 'R' if any(np.logical_and(right_lever_on>= sample_on[t] 
-                      - 0.001, right_lever_on<=sample_off[t] + 0.001)) else 'L'
-        opto_trial[t] = True if any(np.logical_and(opto_on>= trial_on[t], 
-                            opto_on<=trial_off[t])) else False
-        if opto_trial == True:
-            if any(np.logical_and(opto_on>= sample_on[t], 
-                            opto_on<=sample_off[t])):
-                opto_event[t] = 'S' 
-            if any(np.logical_and(opto_on>= delay_on_t, 
-                            opto_on<=delay_off[t])):
-                opto_event[t] =  'D'
-            if any(np.logical_and(opto_on>= choice_on_t, 
-                            opto_on<=choice_off[t])):
-                opto_event[t] =  'C'
         
         #Variables that can only have one value per trial
+        trial_sample_on[t] = sample_on[np.logical_and(sample_on>= trial_on[t] 
+                      , sample_on<=trial_off[t])] if any(np.logical_and(sample_on
+                        >= trial_on[t], sample_on <= trial_off[t])) else np.nan
+        
+        trial_sample_off[t] = sample_off[np.logical_and(sample_off>= trial_on[t] 
+                      , sample_off<=trial_off[t])] if any(np.logical_and(sample_off
+                        >= trial_on[t], sample_off <= trial_off[t])) else np.nan
         
         trial_delay_on[t] = delay_on[np.logical_and(delay_on>= trial_on[t] 
                       , delay_on<=trial_off[t])] if any(np.logical_and(delay_on
@@ -234,39 +267,91 @@ def extract_behaviour_sync(sync, output_path=None, save=False, chmap=None):
         trial_nosepoke_off.append(nosepoke_off[np.logical_and(nosepoke_off>= trial_on[t] 
                       , nosepoke_off<=trial_off[t])] if any(np.logical_and(nosepoke_off
                         >= trial_on[t], nosepoke_off <= trial_off[t])) else np.nan)
+                                                                           
+        # Giving 1 ms leeway for syncing pulse error
+        # Variables that require logic computation
+        
+        if math.isnan(trial_sample_on[t]) == True:
+             trial_trial_side[t] = ''
+        else:
+            trial_trial_side[t] = 'R' if any(np.logical_and(right_lever_on>= trial_sample_on[t] 
+                          - 0.001, right_lever_on<=trial_sample_off[t] + 0.001)) else 'L'
+        trial_opto_trial[t] = True if any(np.logical_and(opto_on>= trial_on[t], 
+                            opto_on<=trial_off[t])) else False
+        if trial_opto_trial[t] == True:
+            if any(np.logical_and(opto_on>= trial_sample_on[t], 
+                            opto_on<=trial_sample_off[t])):
+                trial_opto_event[t] = 'S' 
+            if any(np.logical_and(opto_on>= trial_delay_on[t], 
+                            opto_on<=trial_delay_off[t])):
+                trial_opto_event[t] =  'D'
+            if any(np.logical_and(opto_on>= trial_choice_on[t], 
+                            opto_on<=trial_choice_off[t])):
+                trial_opto_event[t] =  'C'
         
         # Calculate vector of completed trials
-        trial_completed = np.logical_and(trial_delay_on[t] != np.nan,trial_choice_on[t] != np.nan
-                      , nosepoke_on<=trial_off[t])
+        trial_completed[t] = not math.isnan(trial_choice_on[t])
         
         
         # Calculates vector of correct trials
-        trial_correct = np.logical_and(trial_delay_on[t] != np.nan,trial_choice_on[t] != np.nan,
-                       trial_reward_pump_on[t] != np.nan)
+        trial_correct[t] = not math.isnan(trial_reward_pump_on[t])
         
         # Calculate vector with extremes of outcome,opto and nosepoke
-        trial_outcome_first = min(i) for i in trial_outcome_on[t]
-        trial_outcome_last = min(i) for i in trial_outcome_off[t]
-        trial_nosepoke_first = min(i) for i in trial_nosepoke_on[t]
-        trial_nosepoke_last = min(i) for i in trial_nosepoke_off[t]
-        trial_opto_first = min(i) for i in trial_opto_on[t]
-        trial_opto_last = min(i) for i in trial_opto_off[t]
+        trial_outcome_first[t] = min(trial_outcome_on[t]) if not np.mean(np.isnan(trial_outcome_on[t])) else np.nan
+        trial_outcome_last[t] = min(trial_outcome_off[t]) if not np.mean(np.isnan(trial_outcome_on[t])) else np.nan
+        trial_nosepoke_first[t] = min(trial_nosepoke_on[t]) if not np.mean(np.isnan(trial_nosepoke_on[t])) else np.nan
+        trial_nosepoke_last[t] = min(trial_nosepoke_off[t]) if not np.mean(np.isnan(trial_nosepoke_on[t])) else np.nan
+        trial_opto_first[t] = min(trial_opto_on[t]) if not np.mean(np.isnan(trial_opto_on[t])) else np.nan
+        trial_opto_last[t] = min(trial_opto_off[t]) if not np.mean(np.isnan(trial_opto_on[t])) else np.nan
         
-        if save == True:
-            
+    if save==True:
+        np.save(output_path + '/' + '_trial_on.npy', trial_trial_on)
+        np.save(output_path + '/' + '_trial_off.npy', trial_trial_off)
+        np.save(output_path + '/' + '_trial_sample_on.npy', trial_sample_on)
+        np.save(output_path + '/' + '_trial_sample_off.npy', trial_sample_off)
+        np.save(output_path + '/' + '_trial_delay_on.npy', trial_delay_on)
+        np.save(output_path + '/' + '_trial_delay_off.npy', trial_delay_off)
+        np.save(output_path + '/' + '_trial_choice_on.npy', trial_choice_on)
+        np.save(output_path + '/' + '_trial_choice_off.npy', trial_choice_off)
+        np.save(output_path + '/' + '_trial_reward_pump_on.npy', trial_reward_pump_on)
+        np.save(output_path + '/' + '_trial_reward_pump_off.npy', trial_reward_pump_off)
+        np.save(output_path + '/' + '_trial_outcome_on.npy', trial_outcome_on)
+        np.save(output_path + '/' + '_trial_outcome_off.npy', trial_outcome_off)
+        np.save(output_path + '/' + '_trial_opto_on.npy', trial_opto_on)
+        np.save(output_path + '/' + '_trial_opto_off.npy', trial_opto_off)
+        np.save(output_path + '/' + '_trial_nosepoke_on.npy', trial_nosepoke_on)
+        np.save(output_path + '/' + '_trial_nosepoke_off.npy', trial_nosepoke_off)
+        np.save(output_path + '/' + '_trial_trial_side.npy', trial_trial_side)
+        np.save(output_path + '/' + '_trial_opto_trial.npy', trial_opto_trial)
+        np.save(output_path + '/' + '_trial_completed.npy', trial_completed)
+        np.save(output_path + '/' + '_trial_correct.npy', trial_correct)
+        np.save(output_path + '/' + '_trial_outcome_first.npy', trial_outcome_first)
+        np.save(output_path + '/' + '_trial_outcome_last.npy', trial_outcome_last)
+        np.save(output_path + '/' + '_trial_nosepoke_first.npy', trial_nosepoke_first)
+        np.save(output_path + '/' + '_trial_nosepoke_last.npy', trial_nosepoke_last)
+        np.save(output_path + '/' + '_trial_opto_first.npy', trial_opto_first)
+        np.save(output_path + '/' + '_trial_opto_last.npy', trial_opto_last)
+
+def fix_keys(sync):
+    '''
+    Fixes keys of bunch objects to channels, polarirites and times
+    :param sync : bunch object with channels, polarities and times
+    :return : bunch file with standardized name
+
+    '''
+    sync['channels'] = sync.pop(sorted(sync)[0])
+    sync['polarities'] = sync.pop(sorted(sync)[1])
+    sync['times'] = sync.pop(sorted(sync)[2])
     
+    return sync
 
 
-def _get_sync_fronts(sync, channel_nb):
-    return Bunch({'times': sync['times'][sync['channels'] == channel_nb],
-                  'polarities': sync['polarities'][sync['channels'] == channel_nb]})
-
-
-_, sync  = extract_sync(session_path, save=False, force=False, ephys_files=None)
-
-        
-extract_camera_sync(sync, output_path=session, save=True, chmap=sync_chmap)
-extract_behaviour_sync(sync, output_path=None, save=True, chmap=None)
+if __name__ == "__main__":
+    output_path=  str((sys.argv[1]))
+    _, sync  = extract_sync(output_path, save=True, force=False, ephys_files=None)
+    synced = fix_keys(sync) # This will make sure indexing is correct
+    extract_camera_sync(synced, output_path=output_path, save=True, chmap=None)
+    extract_behaviour_sync(synced, output_path=output_path, save=True, chmap=None)
 
 
 
