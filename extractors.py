@@ -235,8 +235,8 @@ def extract_behaviour_sync(sync, output_path=None, save=False, chmap=None):
         if math.isnan(trial_sample_on[t]) == True:
              trial_trial_side[t] = ''
         else:
-            trial_trial_side[t] = 'R' if any(np.logical_and(right_lever_on>= trial_sample_on[t] 
-                          - 0.001, right_lever_on<=trial_sample_off[t] + 0.001)) else 'L'
+            trial_trial_side[t] = 'R' if any(np.logical_and(right_lever_on>= (trial_sample_on[t] - 0.002)
+                          , right_lever_on<=trial_sample_off[t])) else 'L'
         trial_opto_trial[t] = True if any(np.logical_and(opto_on>= trial_on[t], 
                             opto_on<=trial_off[t])) else False
         if trial_opto_trial[t] == True:
@@ -251,7 +251,7 @@ def extract_behaviour_sync(sync, output_path=None, save=False, chmap=None):
                 trial_opto_event[t] =  'C'
 
         # Calculate vector of completed trials
-        trial_completed[t] = not math.isnan(trial_choice_on[t])
+        trial_completed[t] = not math.isnan(trial_outcome_on[t])
 
 
         # Calculates vector of correct trials
@@ -317,8 +317,7 @@ def extract_camera_sync(sync, output_path=None, save=False, chmap=None):
         output_path.mkdir()
     s = _get_sync_fronts(sync, chmap['camera'])
     np.save(output_path / '_Camera.times.npy', s.times[::2])
-    
-    
+      
 def cut_odd_events(end_time, event, save = True):
     """
     
