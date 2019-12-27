@@ -56,7 +56,19 @@ def extract_behaviour_sync(sync, output_path=None, save=False, chmap=None):
     reward_pump = _get_sync_fronts(sync, chmap['reward_pump'])
     reward_port = _get_sync_fronts(sync, chmap['reward_port'])
 
-     # Fix for unfinished trials
+    # Check and merge abnormal pulses
+    for i  in [trial, sample, delay, choice, outcome, opto, 
+               right_lever, nosepoke, reward_pump, reward_port]:
+       if np.any(np.diff(i['times']) < 0.025):
+           prom = np.where(np.diff(i['times']) < 0.025)
+           prom =  np.array(prom)
+           prom1  = prom + 1
+           todel = np.concatenate((prom, prom1))
+           todel = np.unique(todel)
+           i['times'] = np.delete(i['times'],todel)
+           i['polarities'] = np.delete(i['polarities'],todel)  
+    
+    # Fix for unfinished trials
     if np.count_nonzero(trial['times']) % 2 != 0 :
         print('Warning: Unfinished trial, cutting last trial')
         new_end = trial['times'][-2]
@@ -74,6 +86,7 @@ def extract_behaviour_sync(sync, output_path=None, save=False, chmap=None):
     #Assertion QC
     assert np.count_nonzero(trial['times']) % 2 ==0,'ERROR: Uneven trial fronts'
     assert np.count_nonzero(trial['times']) % 2 ==0,'ERROR: Uneven trial fronts'
+    
 
 
     # Divide by on and off
